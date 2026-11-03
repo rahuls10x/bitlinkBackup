@@ -131,8 +131,9 @@ Bitlink backend follows a layered dependency injection architecture closely mirr
 - **Purpose**: S3-compatible object storage repository wrapping `AWSSDK.S3` for MinIO transfers.
 - **Class**: `BucketRepository : IBucketRepository`
 - **Methods**:
-  - `GetUploadSignedUrlAsync(string key, string contentType, long contentLength, int expiresIn)`: Generates a presigned S3 PUT URL for direct-to-storage client uploads.
-  - `GetDownloadSignedUrlAsync(string key, int expiresIn)`: Generates a presigned S3 GET URL for file download/preview.
+  - `DetermineProtocol()`: Inspects `S3Options.Endpoint` to assign `Protocol.HTTP` or `Protocol.HTTPS` dynamically so plain HTTP local MinIO endpoints do not cause SSL handshake errors.
+  - `GetUploadSignedUrlAsync(string key, string contentType, long contentLength, int expiresIn)`: Generates a presigned S3 PUT URL for direct-to-storage client uploads with correct scheme.
+  - `GetDownloadSignedUrlAsync(string key, int expiresIn)`: Generates a presigned S3 GET URL for file download/preview with correct scheme.
   - `FileExistsAsync(string key)`: Executes `GetObjectMetadataAsync` (HEAD request) to verify binary presence in MinIO.
   - `DeleteFileAsync(string key)`: Deletes the binary object from the bucket.
 - **Dependencies**: `IAmazonS3`, `IOptions<S3Options>`.

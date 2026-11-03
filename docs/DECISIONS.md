@@ -1,5 +1,18 @@
 # Decision Log
 
+## 2026-11-03 / Fix S3 Presigned URL Protocol Scheme for MinIO
+- **Files Changed**:
+  - `new-backend-server/Bitlink.Api/Repositories/BucketRepository.cs`
+  - `new-backend-server/Bitlink.Tests/BucketRepositoryTests.cs`
+  - `new-backend-server/Bitlink.Tests/LiveUploadIntegrationTest.cs`
+  - `docs/DECISIONS.md`
+- **Why**:
+  - `AWSSDK.S3`'s `GetPreSignedUrlRequest.Protocol` property defaults to `Protocol.HTTPS`, generating `https://localhost:9000/...` URLs even when `Endpoint` is configured with `http://`.
+  - When clients (browser or curl) attempted direct PUT uploads to MinIO on port 9000 using HTTPS, the connection failed immediately with SSL handshake errors (`SEC_E_INVALID_TOKEN` / `ERR_SSL_PROTOCOL_ERROR`) because MinIO was serving plain HTTP.
+  - Resolved by dynamically inspecting `S3Options.Endpoint` in `BucketRepository` and setting `request.Protocol = DetermineProtocol()` (`Protocol.HTTP` when using `http://`), enabling direct S3 uploads and downloads without TLS errors.
+  - Validated via unit tests and end-to-end integration test against live MinIO container.
+
+
 ## 2026-11-03 / Migrate Backend to ASP.NET Core Web API + PostgreSQL
 - **Files Changed**:
   - `new-backend-server/Bitlink.sln`

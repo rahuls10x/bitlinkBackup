@@ -13,13 +13,20 @@ namespace Bitlink.Api.Repositories;
 public class BucketRepository : IBucketRepository
 {
     private readonly IAmazonS3 _s3Client;
+    private readonly S3Options _s3Options;
     private readonly string _bucketName;
 
     public BucketRepository(IAmazonS3 s3Client, IOptions<S3Options> s3Options)
     {
         _s3Client = s3Client;
-        _bucketName = s3Options.Value.BucketName;
+        _s3Options = s3Options.Value;
+        _bucketName = _s3Options.BucketName;
     }
+
+    private Protocol DetermineProtocol() =>
+        _s3Options.Endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            ? Protocol.HTTPS
+            : Protocol.HTTP;
 
     /// <summary>
     /// Generates a presigned PUT URL for uploading an object directly to S3/MinIO.
@@ -32,7 +39,8 @@ public class BucketRepository : IBucketRepository
             Key = key,
             Verb = HttpVerb.PUT,
             Expires = DateTime.UtcNow.AddSeconds(expiresIn),
-            ContentType = contentType
+            ContentType = contentType,
+            Protocol = DetermineProtocol()
         };
 
         var url = _s3Client.GetPreSignedURL(request);
@@ -49,7 +57,8 @@ public class BucketRepository : IBucketRepository
             BucketName = _bucketName,
             Key = key,
             Verb = HttpVerb.GET,
-            Expires = DateTime.UtcNow.AddSeconds(expiresIn)
+            Expires = DateTime.UtcNow.AddSeconds(expiresIn),
+            Protocol = DetermineProtocol()
         };
 
         var url = _s3Client.GetPreSignedURL(request);

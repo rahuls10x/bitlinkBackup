@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Bitlink.Api/Bitlink.Api.csproj" />
+  <Project Path="Bitlink.Tests/Bitlink.Tests.csproj" />
+</Solution>

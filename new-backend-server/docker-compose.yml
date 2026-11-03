@@ -1,0 +1,76 @@
+name: bitlink-new
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: bitlink-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_BIND_IP:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bitlink}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bitlink_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-bitlink}
+    volumes:
+      - bitlink-pg-data:/var/lib/postgresql/data
+    networks:
+      - default
+
+  minio:
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+    container_name: bitlink-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_BIND_IP:-127.0.0.1}:${MINIO_PORT:-9000}:9000"
+      - "${MINIO_BIND_IP:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-root}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-rootpass}
+    volumes:
+      - bitlink_minio-data:/data
+    restart: unless-stopped
+    networks:
+      - default
+
+  backend-server:
+    build:
+      context: ./Bitlink.Api
+      dockerfile: Dockerfile
+    container_name: bitlink-backend-api
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_BIND_IP:-127.0.0.1}:${BACKEND_PORT:-4001}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: "http://+:8080"
+      PORT: "4001"
+      ORIGIN_URL: ${ORIGIN_URL:-http://localhost:5174}
+      AUTH_SERVER_URL: ${DOCKER_AUTH_SERVER_URL:-http://authentication-server:4000}
+      RESOURCE_SERVER_URL: ${DOCKER_RESOURCE_SERVER_URL:-http://resource-server:5000}
+      CLIENT_ID: ${CLIENT_ID}
+      CLIENT_SECRET: ${CLIENT_SECRET}
+      REDIRECT_URI: ${REDIRECT_URI:-http://localhost:5174/callback}
+      S3_ENDPOINT: ${S3_DOCKER_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-bitlink-bucket}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-root}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-rootpass}
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-bitlink};Username=${POSTGRES_USER:-bitlink};Password=${POSTGRES_PASSWORD:-bitlink_secure_password}"
+    depends_on:
+      - postgres
+      - minio
+    networks:
+      - default
+      - truth-network
+
+volumes:
+  bitlink-pg-data:
+  bitlink_minio-data:
+    external: true
+
+networks:
+  default:
+    driver: bridge
+  truth-network:
+    external: true
+    name: truth_default

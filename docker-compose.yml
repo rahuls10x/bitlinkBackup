@@ -1,0 +1,82 @@
+name: Bitlink
+services:
+  backend-server:
+    build:
+      context: ./backend-server
+      dockerfile: Dockerfile
+    networks:
+      - default
+      - truth-network
+    ports:
+      - "${BACKEND_BIND_IP:-127.0.0.1}:${BACKEND_PORT:-4001}:4001"
+    environment:
+      PORT: "4001"
+      ORIGIN_URL: ${ORIGIN_URL:-http://localhost:5174}
+      AUTH_SERVER_URL: ${AUTH_SERVER_URL:-http://authentication-server:4000}
+      RESOURCE_SERVER_URL: ${RESOURCE_SERVER_URL:-http://resource-server:5000}
+      CLIENT_ID: ${CLIENT_ID:?Set CLIENT_ID in .env}
+      CLIENT_SECRET: ${CLIENT_SECRET:?Set CLIENT_SECRET in .env}
+      REDIRECT_URI: ${REDIRECT_URI:-http://localhost:5174/callback}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-bitlink-bucket}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-root}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-rootpass}
+      MONGO_DB: mongodb://mongo:27017/
+      REDIS_DB: redis://redis:6379
+    restart: unless-stopped
+    depends_on:
+      - mongo
+      - redis
+
+  frontend-server:
+    build:
+      context: ./frontend-server
+      dockerfile: Dockerfile
+      args:
+        VITE_CLIENT_ID: ${CLIENT_ID:?Set CLIENT_ID in .env}
+        VITE_REDIRECT_URI: ${REDIRECT_URI:-http://localhost:5174/callback}
+        VITE_AUTH_URL: ${VITE_AUTH_URL:-http://localhost:4000/authorize}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4001}
+    ports:
+      - "${FRONTEND_BIND_IP:-127.0.0.1}:${FRONTEND_PORT:-5174}:81"
+    restart: unless-stopped
+    depends_on:
+      - backend-server
+
+  mongo:
+    image: mongo:8
+    ports:
+      - "127.0.0.1:${MONGO_PORT:-27018}:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  redis:
+    image: redis:8
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
+
+  minio:
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_BIND_IP:-127.0.0.1}:${MINIO_PORT:-9000}:9000"
+      - "${MINIO_BIND_IP:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  minio-data:
+
+networks:
+  default:
+    driver: bridge
+
+  truth-network:
+    external: true
+    name: truth_default
